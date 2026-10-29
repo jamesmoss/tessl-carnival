@@ -67,6 +67,49 @@ describe('score board', () => {
     expect(board.best('water-cannon')).toBe(90);
   });
 
+  it('keeps the top 50 when a lower score is recorded', () => {
+    let clock = 0;
+    const board = createScoreBoard(memoryStorage(), () => ++clock);
+    for (let score = 100; score < 150; score++) board.record('water-cannon', score);
+    const before = board.top('water-cannon', 100);
+    const entry = board.record('water-cannon', 5);
+    expect(entry.score).toBe(5);
+    expect(board.top('water-cannon', 100)).toEqual(before);
+    expect(board.best('water-cannon')).toBe(149);
+  });
+
+  it('keeps a qualifying score and drops the lowest', () => {
+    let clock = 0;
+    const board = createScoreBoard(memoryStorage(), () => ++clock);
+    for (let score = 100; score < 150; score++) board.record('water-cannon', score);
+    board.record('water-cannon', 125);
+    const scores = board.top('water-cannon', 100).map((e) => e.score);
+    expect(scores).toHaveLength(50);
+    expect(scores.filter((s) => s === 125)).toHaveLength(2);
+    expect(scores).not.toContain(100);
+    expect(Math.min(...scores)).toBe(101);
+  });
+
+  it('keeps the earlier of equal scores at the boundary', () => {
+    let clock = 0;
+    const board = createScoreBoard(memoryStorage(), () => ++clock);
+    for (let score = 100; score < 150; score++) board.record('water-cannon', score);
+    board.record('water-cannon', 100);
+    const kept = board.top('water-cannon', 100);
+    expect(kept).toHaveLength(50);
+    expect(kept.at(-1)).toEqual({ gameId: 'water-cannon', score: 100, at: 1 });
+  });
+
+  it('keeps other games when the cap trims a game', () => {
+    let clock = 0;
+    const board = createScoreBoard(memoryStorage(), () => ++clock);
+    board.record('ring-toss', 70);
+    board.record('ring-toss', 30);
+    for (let score = 100; score < 160; score++) board.record('water-cannon', score);
+    expect(board.top('ring-toss', 10).map((e) => e.score)).toEqual([70, 30]);
+    expect(board.top('water-cannon', 100)).toHaveLength(50);
+  });
+
   it('rejects negative and non-numeric scores', () => {
     const board = createScoreBoard(memoryStorage());
     expect(() => board.record('water-cannon', -1)).toThrow();
