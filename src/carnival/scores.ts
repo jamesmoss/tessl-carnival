@@ -30,11 +30,15 @@ export function createScoreBoard(storage: ScoreStorage, now: () => number = Date
     }
   }
 
+  function ranked(entries: ScoreEntry[], count: number): ScoreEntry[] {
+    return [...entries].sort((a, b) => b.score - a.score || a.at - b.at).slice(0, count);
+  }
+
   function top(gameId: string, count: number): ScoreEntry[] {
-    return load()
-      .filter((entry) => entry.gameId === gameId)
-      .sort((a, b) => b.score - a.score || a.at - b.at)
-      .slice(0, count);
+    return ranked(
+      load().filter((entry) => entry.gameId === gameId),
+      count,
+    );
   }
 
   function record(gameId: string, score: number): ScoreEntry {
@@ -42,8 +46,12 @@ export function createScoreBoard(storage: ScoreStorage, now: () => number = Date
       throw new Error(`Score must be a non-negative number, got ${score}`);
     }
     const entry: ScoreEntry = { gameId, score: Math.round(score), at: now() };
-    const others = load().filter((e) => e.gameId !== gameId);
-    const kept = [...top(gameId, MAX_ENTRIES_PER_GAME - 1), entry];
+    const entries = load();
+    const others = entries.filter((e) => e.gameId !== gameId);
+    const kept = ranked(
+      [...entries.filter((e) => e.gameId === gameId), entry],
+      MAX_ENTRIES_PER_GAME,
+    );
     const value = JSON.stringify([...others, ...kept]);
     try {
       store.setItem(STORAGE_KEY, value);
